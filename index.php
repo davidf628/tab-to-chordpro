@@ -31,8 +31,15 @@
 <?php
 session_start(); // To store conversion result for download
 
+function remove_blank_strings(array $input): array {
+    return array_values(array_filter($input, function($str) {
+        return trim($str) !== '';
+    }));
+}
+
 function parse_to_chordpro($text, $add_comments = true) {
     $lines = preg_split("/\r\n|\n|\r/", trim($text));
+    $lines = remove_blank_strings($lines);
     $output = '';
     $sectionCount = 1;
 
@@ -88,6 +95,8 @@ function parse_to_chordpro($text, $add_comments = true) {
 
     return trim($output);
 }
+
+parse_to_chordpro(file_get_contents('./pink-pony-club.txt'));
 
 if (isset($_POST['convert'])) {
     $rawText = '';
