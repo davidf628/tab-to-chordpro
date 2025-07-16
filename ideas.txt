@@ -1,0 +1,7 @@
+- go through the file line by line and identify the lines that contain chords by creating
+  a regex that looks for things like [A] [Cmaj7] Esus4 etc.
+
+- determine the number of spaces over each chord is from the start of the line
+
+- go into the next line and place the chord at the start of the word which is closest to that 
+  number of spaces
