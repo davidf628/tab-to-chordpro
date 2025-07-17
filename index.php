@@ -19,33 +19,22 @@
   <label>Or upload a .txt file:</label><br>
   <input type="file" name="upload"><br>
 
-  <label>Add section comments?</label>
-  <select name="add_comments">
-    <option value="yes" selected>Yes</option>
-    <option value="no">No</option>
-  </select><br>
-
   <input type="submit" name="convert" value="Convert">
 </form>
 
 <?php
 session_start(); // To store conversion result for download
 
-function is_chord_line(string $line): array|false {
+function extract_chords_from_line(string $line): array {
     // Remove trailing newline and extra spaces
     $line = rtrim($line);
 
     // Regex to match a chord, optionally wrapped in []
     // Matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
-    $chordPattern = '\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?\d*)\s*\]?';
+    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?\d*)\s*\]?/';
 
     // Find all matches along with their offsets
-    preg_match_all('/' . $chordPattern . '/', $line, $matches, PREG_OFFSET_CAPTURE);
-
-    // If no matches, it's definitely not a chord line
-    if (empty($matches[1])) {
-        return false;
-    }
+    preg_match_all($chordPattern, $line, $matches, PREG_OFFSET_CAPTURE);
 
     // Build structured list of chords + positions
     $chords = [];
@@ -66,18 +55,28 @@ function is_chord_line(string $line): array|false {
         }
     }
 
-    // Remove all matched chords + spaces and see if leftover contains anything non-space
-    $lineWithoutChords = preg_replace('/' . $chordPattern . '/', '', $line);
-    $lineWithoutChords = trim($lineWithoutChords);
+    return $chords;
+}
 
-    // If leftover contains text (lyrics), it's NOT purely a chord line
-    if ($lineWithoutChords !== '') {
+function is_chord_line(string $line): bool {
+
+    if(is_empty_line($line)) {
         return false;
     }
 
-    return $chords;
+    // regex to match a chord, optionally wrapped in []
+    // matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
+    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?\d*)\s*\]?/';
+
+    // remove all matched chords + spaces and see if leftover contains anything non-space
+    $lineWithoutChords = preg_replace($chordPattern, '', $line);
+    $lineWithoutChords = trim($lineWithoutChords);
+
+    // if leftover contains text (lyrics), it's not purely a chord line
+    return $lineWithoutChords === '';
 }
-function convert_bracketed_section(string $line): string {
+
+function convert_section_header(string $line): string {
     $trimmed = trim($line);
 
     // Match a line like [Intro], [Verse 1], [Chorus], etc.
@@ -90,125 +89,76 @@ function convert_bracketed_section(string $line): string {
     return $line;
 }
 
-// function remove_blank_strings(array $input): array {
-//     return array_values(array_filter($input, function($str) {
-//         return trim($str) !== '';
-//     }));
-// }
-
 function normalize_spacing(string $line): string {
-    // Trim leading/trailing whitespace
+    // trim whitespace and remove double-spaces
     $trimmed = trim($line);
-
-    // Replace 2+ spaces/tabs with a single space
     $normalized = preg_replace('/\s{2,}/', ' ', $trimmed);
 
     return $normalized;
 }
 
-// function parse_to_chordpro($text, $add_comments = true) {
-//     $lines = preg_split("/\r\n|\n|\r/", trim($text));
-//     $lines = remove_blank_strings($lines);
-//     $output = '';
-//     $sectionCount = 1;
-
-//     for ($i = 0; $i < count($lines); $i++) {
-//         $line = rtrim($lines[$i]);
-
-//         if (trim($line) === '') {
-//             $output .= "\n";
-//             continue;
-//         }
-
-//         if ($i + 1 < count($lines)) {
-//             $chordLine = $line;
-//             $lyricLine = $lines[$i + 1];
-
-//             if (preg_match('/[A-G][#b]?m?(aj|sus|dim|aug)?\d*/', $chordLine) && preg_match('/[a-zA-Z]/', $lyricLine)) {
-//                 if ($add_comments) {
-//                     $output .= "{comment:Section $sectionCount}\n";
-//                     $sectionCount++;
-//                 }
-
-//                 $combined = '';
-//                 $j = 0;
-
-//                 while ($j < strlen($lyricLine)) {
-//                     if (isset($chordLine[$j]) && trim($chordLine[$j]) !== '') {
-//                         $chord = '';
-//                         while (isset($chordLine[$j]) && $chordLine[$j] !== ' ') {
-//                             $chord .= $chordLine[$j];
-//                             $j++;
-//                         }
-//                         $combined .= "[$chord]";
-//                     }
-
-//                     $combined .= $lyricLine[$j] ?? '';
-//                     $j++;
-//                 }
-
-//                 $output .= $combined . "\n";
-//                 $i++; // Skip next line
-//                 continue;
-//             }
-//         }
-
-//         if ($add_comments && stripos($line, 'verse') !== false) {
-//             $output .= "{comment:" . trim($line) . "}\n";
-//         } elseif ($add_comments && stripos($line, 'chorus') !== false) {
-//             $output .= "{comment:" . trim($line) . "}\n";
-//         } else {
-//             $output .= $line . "\n";
-//         }
-//     }
-
-//     return trim($output);
-// }
-
-function is_lyric_line(string $line): bool {
-
-    // Empty line is NOT lyrics
-    if (trim($line) === '') {
-        return false;
-    }
-
-    // 1) If entire line is wrapped in brackets [Intro] -> NOT lyrics
-    if (preg_match('/^\[.*\]$/', trim($line))) {
-        return false;
-    }
-
-    // 2) If entire line is wrapped in brackets {c: Intro} -> NOT lyrics
-    if (preg_match('/^\{.*\}$/', trim($line))) {
-        return false;
-    }
-
-    // 3) If line is only chords -> NOT lyrics
-    return is_chord_line($line) === false;
-
+function is_empty_line(string $line): bool {
+    return trim($line) === '';
 }
 
+function is_lyric_line(string $line): bool {
+    if (is_empty_line($line) || is_section_header($line)) {
+        return false;
+    }
+    return is_chord_line($line) === false;
+}
+
+function is_section_header(string $line): bool {
+    $trimmed = trim($line);
+    $is_bracketed = preg_match('/^\[.*\]$/', $trimmed);
+    $is_curlybraced = preg_match('/^\{.*\}$/', $trimmed);
+    return $is_bracketed || $is_curlybraced;
+}
+
+function get_next_line(array $lines, int $start): string {
+    $i = $start + 1;
+    $number_of_lines = count($lines);
+    while(($i < $number_of_lines) && is_empty_line($i)) {
+        $i++;
+    }
+    return $lines[$i];
+}
 
 function parse_to_chordpro(array $lines) {
 
     $output = '';
+    $number_of_lines = count($lines);
 
-    foreach($lines as $line) {
-        $line = convert_bracketed_section($line);
-        if (is_chord_line($line)) {
-            //echo "--> CHORDS: ".$line."\n";
-            $output .= "--> CHORDS: ".$line."\n";
-            $chords = is_chord_line($line);
-            foreach($chords as $chord) {
-                $output .= $chord['chord']." ".$chord['offset']."\n";
+    for ($i = 0; $i < $number_of_lines; $i++) {
+
+        $line = $lines[$i];
+
+        if (is_section_header($line)) {
+            $output .= convert_section_header($line)."\n";
+        } elseif (is_chord_line($line)) {
+            $chords = extract_chords_from_line($line);
+            $next_line = get_next_line($lines, $i);
+            if (is_lyric_line($next_line)) {
+                while($lines[$i] !== $next_line) {
+                    $i++; // advance past the current lyric line
+                }
+                $next_line = normalize_spacing($next_line);
+                foreach($chords as $chord) {
+                    $next_line = substr_replace($next_line, $chord['chord'], $chord['offset'], 0);
+                }
+                $output .= $next_line."\n";
+            } else {
+                for ($k = 0; $k < count($chords)-1; $k++) {
+                    $output .= $chord['chord']." [-] ";
+                }
+                $output .= $chords[count($chords)-1]['chord']."\n";
             }
-        } elseif (is_lyric_line($line)) {
-            //echo "--> LYRICS: ".normalize_spacing($line)."\n";
-            $output .= "--> LYRICS: ".normalize_spacing($line)."\n";
         } else {
-            //echo $line."\n";
             $output .= $line."\n";
         }
+
     }
+
     return $output;
 }
 
@@ -227,7 +177,6 @@ if (isset($_POST['convert'])) {
         $rawText = file($_FILES['upload']['tmp_name'], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     }
 
-    $add_comments = $_POST['add_comments'] === 'yes';
     $converted = parse_to_chordpro($rawText);
 
     $_SESSION['chordpro_data'] = $converted;
@@ -236,13 +185,13 @@ if (isset($_POST['convert'])) {
     echo "<textarea readonly>" . htmlspecialchars($converted) . "</textarea><br>";
 
     echo '<form method="POST" action="?download=1">';
-    echo '<input type="submit" value="Download .chordpro file">';
+    echo '<input type="submit" value="Download .pro file">';
     echo '</form>';
 }
 
 // Handle download
 if (isset($_GET['download']) && isset($_SESSION['chordpro_data'])) {
-    $filename = 'converted.chordpro';
+    $filename = 'converted.pro';
     header('Content-Type: text/plain');
     header("Content-Disposition: attachment; filename=\"$filename\"");
     echo $_SESSION['chordpro_data'];
