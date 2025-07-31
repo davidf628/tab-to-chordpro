@@ -1,27 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>UG to ChordPro Converter (PHP)</title>
-  <style>
-    textarea { width: 100%; height: 200px; font-family: monospace; margin: 10px 0; }
-    input[type="file"], select, input[type='submit'] { margin: 10px 0; }
-  </style>
-</head>
-<body>
-
-<h1>Ultimate Guitar Tab to ChordPro Converter</h1>
-
-<form method="POST" enctype="multipart/form-data">
-  <label>Paste your tab:</label><br>
-  <textarea name="pasted" placeholder="Paste UG tab here..."></textarea><br>
-
-  <label>Or upload a .txt file:</label><br>
-  <input type="file" name="upload"><br>
-
-  <input type="submit" name="convert" value="Convert">
-</form>
-
 <?php
 session_start(); // To store conversion result for download
 
@@ -199,6 +175,103 @@ if (isset($_GET['download']) && isset($_SESSION['chordpro_data'])) {
     exit;
 }
 ?>
+
+<?php
+if (isset($_POST['convert-to-rtf']) && isset($_FILES['chordpro_file'])) {
+    $file = $_FILES['chordpro_file'];
+
+    if ($file['error'] === UPLOAD_ERR_OK) {
+        $lines = file($file['tmp_name'], FILE_IGNORE_NEW_LINES);
+
+        $rtf = "{\\rtf1\\ansi\\deff0\n";
+        $rtf .= "{\\fonttbl{\\f0\\fnil Verdana;}}\n";
+        $rtf .= "\\fs24\n"; // Default to 12pt (fs24 = 12pt, fs40 = 20pt, fs16 = 8pt)
+
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+
+            // Title
+            if (str_starts_with(strtolower($trimmed), '{title:')) {
+                $title = trim(substr($trimmed, 7, -1));
+                $rtf .= "\\fs40\\b $title\\b0\\fs24\\par\n";
+            }
+            // Author
+            elseif (str_starts_with(strtolower($trimmed), '{artist:') || str_starts_with(strtolower($trimmed), '{author:')) {
+                $author = trim(substr($trimmed, strpos($trimmed, ':') + 1, -1));
+                $rtf .= "\\fs16 $author\\fs24\\par\n";
+            }
+            // Capo
+            elseif (str_starts_with(strtolower($trimmed), '{capo:')) {
+                $capo = trim(substr($trimmed, 6, -1));
+                $rtf .= "\\fs24\\b Capo: $capo\\b0\\par\n";
+            }
+            // Comment line
+            elseif (preg_match('/^\{[cC](:|\s)/', $trimmed)) {
+                $comment = preg_replace('/^\{[cC](:|\s)|\}$/', '', $trimmed);
+                $rtf .= "$comment\\par\n";
+            }
+            // Blank line
+            elseif ($trimmed === '') {
+                $rtf .= "\\par\n";
+            }
+            // Lyric line with chords
+            else {
+
+                // Escape backslashes and braces for RTF safety
+                $line = str_replace(['\\', '{', '}'], ['\\\\', '\\{', '\\}'], $line);
+
+                // Wrap [Chords] with bold italic
+                $line = preg_replace_callback('/(\[.*?\])/', function ($m) {
+                    return "\\b\\i " . $m[1] . " \\i0\\b0 ";
+                }, $trimmed);
+
+                $rtf .= "$line\\par\n";
+            }
+        }
+
+        $rtf .= "}\n"; // End RTF
+
+        // Output file
+        header('Content-Type: application/rtf');
+        header('Content-Disposition: attachment; filename="converted_song.rtf"');
+        echo $rtf;
+        exit;
+    } else {
+        echo "<p>Upload error.</p>";
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>UG to ChordPro Converter (PHP)</title>
+  <style>
+    textarea { width: 100%; height: 200px; font-family: monospace; margin: 10px 0; }
+    input[type="file"], select, input[type='submit'] { margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+<h1>Ultimate Guitar Tab to ChordPro Converter</h1>
+
+<form method="POST" enctype="multipart/form-data">
+  <label>Paste your tab:</label><br>
+  <textarea name="pasted" placeholder="Paste UG tab here..."></textarea><br>
+
+  <label>Or upload a .txt file:</label><br>
+  <input type="file" name="upload"><br>
+
+  <input type="submit" name="convert" value="Convert">
+</form>
+
+<h1>Convert ChordPro to RTF</h1>
+  <form method="POST" enctype="multipart/form-data">
+    <label>Select a .chordpro file:</label><br>
+    <input type="file" name="chordpro_file" accept=".pro,.chordpro,.txt"><br><br>
+    <input type="submit" name="convert-to-rtf" value="Convert to RTF">
+  </form>
 
 </body>
 </html>
