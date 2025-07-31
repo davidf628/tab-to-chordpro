@@ -31,7 +31,7 @@ function extract_chords_from_line(string $line): array {
 
     // Regex to match a chord, optionally wrapped in []
     // Matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
-    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?\d*)\s*\]?/';
+    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
 
     // Find all matches along with their offsets
     preg_match_all($chordPattern, $line, $matches, PREG_OFFSET_CAPTURE);
