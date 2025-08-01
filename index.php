@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 session_start(); // To store conversion result for download
 
 function extract_chords_from_line(string $line): array {
@@ -93,11 +96,11 @@ function is_section_header(string $line): bool {
 
 function get_next_line(array $lines, int $start): string {
     $i = $start + 1;
-    $number_of_lines = count($lines);
-    while(($i < $number_of_lines) && is_empty_line($i)) {
+    $number_of_lines = count($lines)-1;
+    while(($i < $number_of_lines) && is_empty_line($lines[$i])) {
         $i++;
     }
-    return $lines[$i];
+    return $i < $number_of_lines ? $lines[$i] : "";
 }
 
 function parse_to_chordpro(array $lines) {
@@ -125,6 +128,7 @@ function parse_to_chordpro(array $lines) {
                 $output .= $next_line."\n";
             } else {
                 for ($k = 0; $k < count($chords)-1; $k++) {
+                    $chord = $chords[$k];
                     $output .= $chord['chord']." [-] ";
                 }
                 $output .= $chords[count($chords)-1]['chord']."\n";
@@ -142,38 +146,39 @@ function parse_to_chordpro(array $lines) {
 //$lines = file('./pink-pony-club.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 //echo parse_to_chordpro($lines);
 
-if (isset($_POST['convert'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['upload']) && isset($_POST['convert-to-pro'])) {
     $rawText = '';
 
-    if (!empty($_POST['pasted'])) {
-        $rawText = $_POST['pasted'];
-    }
+    //echo "console.log('hi there');";
+    //if (!empty($_POST['pasted'])) {
+    //    $rawText = $_POST['pasted'];
+    //}
 
-    if (isset($_FILES['upload']) && $_FILES['upload']['error'] === UPLOAD_ERR_OK) {
+    $file = $_FILES['upload'];
+
+    if ($file['error'] === UPLOAD_ERR_OK) {
         $rawText = file($_FILES['upload']['tmp_name'], FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     }
+
+    //print_r($rawText);
 
     $converted = parse_to_chordpro($rawText);
 
     $_SESSION['chordpro_data'] = $converted;
-
-    echo "<h2>ChordPro Output:</h2>";
-    echo "<textarea readonly>" . htmlspecialchars($converted) . "</textarea><br>";
-
-    echo '<form method="POST" action="?download=1">';
-    echo '<input type="submit" value="Download .pro file">';
-    echo '</form>';
-}
-
-// Handle download
-if (isset($_GET['download']) && isset($_SESSION['chordpro_data'])) {
     $filename = 'converted.pro';
     header('Content-Type: text/plain');
     header("Content-Disposition: attachment; filename=\"$filename\"");
     echo $_SESSION['chordpro_data'];
     unset($_SESSION['chordpro_data']); // Clear after download
     exit;
+    //echo "<h2>ChordPro Output:</h2>";
+    //echo "<textarea readonly>" . htmlspecialchars($converted) . "</textarea><br>";
+
+    //echo '<form method="POST" action="?download=1">';
+    //echo '<input type="submit" value="Download .pro file">';
+    //echo '</form>';
 }
+
 ?>
 
 <?php
@@ -262,8 +267,7 @@ if (isset($_POST['convert-to-rtf']) && isset($_FILES['chordpro_file'])) {
 
   <label>Or upload a .txt file:</label><br>
   <input type="file" name="upload"><br>
-
-  <input type="submit" name="convert" value="Convert">
+  <button type="submit" name="convert-to-pro">Convert to Chordpro</button>
 </form>
 
 <h1>Convert ChordPro to RTF</h1>
