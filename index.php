@@ -10,7 +10,7 @@ function extract_chords_from_line(string $line): array {
 
     // Regex to match a chord, optionally wrapped in []
     // Matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
-    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
+    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:min|maj\d?|dim|m\d?|aug|sus\d?|add\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
 
     // Find all matches along with their offsets
     preg_match_all($chordPattern, $line, $matches, PREG_OFFSET_CAPTURE);
@@ -45,7 +45,7 @@ function is_chord_line(string $line): bool {
 
     // regex to match a chord, optionally wrapped in []
     // matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
-    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:m|min|maj|dim|aug|sus\d?|add\d?|maj\d?)?\d*)\s*\]?/';
+    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:min|maj\d?|dim|m\d?|aug|sus\d?|add\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
 
     // remove all matched chords + spaces and see if leftover contains anything non-space
     $lineWithoutChords = preg_replace($chordPattern, '', $line);
@@ -121,10 +121,11 @@ function parse_to_chordpro(array $lines) {
                 while($lines[$i] !== $next_line) {
                     $i++; // advance past the current lyric line
                 }
-                $next_line = normalize_spacing($next_line);
-                foreach($chords as $chord) {
+                for($j = count($chords)-1; $j >= 0; $j--) {
+                    $chord = $chords[$j];
                     $next_line = substr_replace($next_line, $chord['chord'], $chord['offset'], 0);
                 }
+                $next_line = normalize_spacing($next_line);
                 $output .= $next_line."\n";
             } else {
                 for ($k = 0; $k < count($chords)-1; $k++) {
@@ -143,7 +144,7 @@ function parse_to_chordpro(array $lines) {
 }
 
 // -- FOR DEBUGGING --
-//$lines = file('./pink-pony-club.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+//$lines = file('./grapes.txt', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 //echo parse_to_chordpro($lines);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['upload']) && isset($_POST['convert-to-pro'])) {
