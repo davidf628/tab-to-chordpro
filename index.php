@@ -4,16 +4,18 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 session_start(); // To store conversion result for download
 
+$chordPattern = '/\[?\s*([A-G](?:#|b)?(?:min|maj\d?|dim|m\d?|aug|sus\d?|add\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
+
 function extract_chords_from_line(string $line): array {
     // Remove trailing newline and extra spaces
     $line = rtrim($line);
 
     // Regex to match a chord, optionally wrapped in []
     // Matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
-    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:min|maj\d?|dim|m\d?|aug|sus\d?|add\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
+    //$chordPattern = '/\[?\s*([A-G](?:#|b)?(?:min|maj\d?|dim|m\d?|aug|sus\d?|add\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
 
     // Find all matches along with their offsets
-    preg_match_all($chordPattern, $line, $matches, PREG_OFFSET_CAPTURE);
+    preg_match_all($GLOBALS['chordPattern'], $line, $matches, PREG_OFFSET_CAPTURE);
 
     // Build structured list of chords + positions
     $chords = [];
@@ -43,12 +45,8 @@ function is_chord_line(string $line): bool {
         return false;
     }
 
-    // regex to match a chord, optionally wrapped in []
-    // matches e.g. C, G#m, Bbmaj7, Dsus4, F#, etc.
-    $chordPattern = '/\[?\s*([A-G](?:#|b)?(?:min|maj\d?|dim|m\d?|aug|sus\d?|add\d?)?(?:(?:\\|\/)[A-G](?:#|b)?)?\d*|N\.C\.)\s*\]?/';
-
     // remove all matched chords + spaces and see if leftover contains anything non-space
-    $lineWithoutChords = preg_replace($chordPattern, '', $line);
+    $lineWithoutChords = preg_replace($GLOBALS['chordPattern'], '', $line);
     $lineWithoutChords = trim($lineWithoutChords);
 
     // if leftover contains text (lyrics), it's not purely a chord line
